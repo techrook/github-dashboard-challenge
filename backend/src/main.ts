@@ -23,6 +23,16 @@ async function bootstrap() {
   app.useGlobalInterceptors(
     new ResponseInterceptor(),
   );
+
+  app.enableCors({
+    origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+      'http://localhost:3000',
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    exposedHeaders: ['Set-Cookie'],
+  });
   const config = new DocumentBuilder()
   .setTitle('GitHub Developer Dashboard API')
   .setDescription(
