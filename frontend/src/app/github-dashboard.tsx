@@ -15,60 +15,87 @@ import ErrorState from "@/components/ErrorState";
 import { useGithub } from "@/hooks/useGithub";
 
 export default function GithubDashboard() {
-  const [username, setUsername] = useState("");
+  const [searchedUsername, setSearchedUsername] = useState("");
 
   const {
-    profile,
-    repositories,
-    languages,
-    stats,
-    activity,
+    dashboard,
     isLoading,
     isError,
-  } = useGithub(username);
+  } = useGithub(searchedUsername);
+
+  const handleSearch = (username: string) => {
+    const value = username.trim();
+
+    if (!value) return;
+
+    setSearchedUsername(value);
+  };
+
+  console.log(dashboard.data)
 
   return (
     <main className="mx-auto max-w-7xl space-y-8 p-8">
-      <SearchBar loading={isLoading} onSearch={setUsername} />
+      <SearchBar
+        loading={isLoading}
+        onSearch={handleSearch}
+      />
 
-      {!username && <EmptyState />}
+      {!searchedUsername && <EmptyState />}
 
-      {username && isLoading && <LoadingSkeleton />}
+      {searchedUsername && isLoading && (
+        <LoadingSkeleton />
+      )}
 
-      {username && isError && (
+      {searchedUsername && isError && (
         <ErrorState
           message="Unable to fetch GitHub data."
-          onRetry={() => setUsername(username)}
+
         />
       )}
 
-      {username && !isLoading && !isError && profile.data && (
-        <>
-          <ProfileCard profile={profile.data} />
+      {searchedUsername &&
+        !isLoading &&
+        !isError &&
+        dashboard.data && (
+          <>
+            <ProfileCard
+              profile={dashboard.data.profile}
+            />
 
-          <StatsCards stats={stats.data} />
+            <StatsCards
+              stats={dashboard.data.stats}
+            />
 
-          <LanguageChart languages={languages.data} />
+            <LanguageChart
+              languages={dashboard.data.languages}
+            />
 
-          <section className="space-y-4">
-            <h2 className="text-2xl font-bold">Repositories</h2>
+            <section className="space-y-4">
+              <h2 className="text-2xl font-bold">
+                Repositories
+              </h2>
 
-            {repositories.data.length === 0 ? (
-              <p className="text-muted-foreground">
-                No public repositories found.
-              </p>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {repositories.data.map((repo: any) => (
-                  <RepositoryCard key={repo.id} repo={repo} />
-                ))}
-              </div>
-            )}
-          </section>
+              {dashboard.data.repositories.length === 0 ? (
+                <p className="text-muted-foreground">
+                  No public repositories found.
+                </p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {dashboard.data.repositories.map((repo: any) => (
+                    <RepositoryCard
+                      key={repo.id}
+                      repo={repo}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
 
-          <ActivityTimeline activities={activity.data} />
-        </>
-      )}
+            <ActivityTimeline
+              activities={dashboard.data.activity}
+            />
+          </>
+        )}
     </main>
   );
 }

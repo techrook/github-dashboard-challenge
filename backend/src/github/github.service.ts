@@ -1,5 +1,11 @@
 import { HttpService } from '@nestjs/axios';
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
 import { AxiosError } from 'axios';
@@ -10,150 +16,60 @@ export class GithubService {
     private readonly http: HttpService,
     private readonly configService: ConfigService,
   ) {}
-
-  async getUser(username: string) {
+  async getGithubDashboard(username: string) {
     try {
-      const profile = await firstValueFrom(
-        this.http.get(`https://api.github.com/users/${username}`),
-      );
+      const [profileResponse, reposResponse, activityResponse] =
+        await Promise.all([
+          firstValueFrom(
+            this.http.get(`https://api.github.com/users/${username}`),
+          ),
+          firstValueFrom(
+            this.http.get(`https://api.github.com/users/${username}/repos`),
+          ),
+          firstValueFrom(
+            this.http.get(
+              `https://api.github.com/users/${username}/events/public`,
+            ),
+          ),
+        ]);
 
-      const user = profile.data;
-      return user;
-    } catch (error) {
-      const err = error as AxiosError;
-      if (err.response?.status === 404) {
-        throw new HttpException(
-          {
-            message: `GitHub user '${username}' not found`,
-          },
-          HttpStatus.NOT_FOUND,
-        );
-      }
+      const profile = profileResponse.data;
+      const repos = reposResponse.data;
+      const activity = activityResponse.data;
 
-      if (error.response?.status === 403) {
-        throw new HttpException(
-          {
-            message: 'GitHub API rate limit exceeded',
-          },
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
-      throw new HttpException(
-        {
-          message: 'Unable to communicate with GitHub',
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-  async getUserRepositories(username: string) {
-    try {
-      const repositories = await this.fetchRepositories(username);
-      return repositories;
-    } catch (error) {
-      const err = error as AxiosError;
-      if (err.response?.status === 404) {
-        throw new HttpException(
-          {
-            message: `GitHub user '${username}' not found`,
-          },
-          HttpStatus.NOT_FOUND,
-        );
-      }
-
-      if (error.response?.status === 403) {
-        throw new HttpException(
-          {
-            message: 'GitHub API rate limit exceeded',
-          },
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
-      throw new HttpException(
-        {
-          message: 'Unable to communicate with GitHub',
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
-  async getUserAggregatedLanguages(username: string) {
-    try {
-      const repos = await this.fetchRepositories(username);
-
+      // Aggregate languages
       const languages: Record<string, number> = {};
-      repos.forEach((repo) => {
+
+      repos.forEach((repo: any) => {
         if (!repo.language) return;
 
         languages[repo.language] = (languages[repo.language] || 0) + 1;
       });
-      return languages;
-    } catch (error) {
-      const err = error as AxiosError;
-      if (err.response?.status === 404) {
-        throw new HttpException(
-          {
-            message: `GitHub user '${username}' not found`,
-          },
-          HttpStatus.NOT_FOUND,
-        );
-      }
 
-      if (error.response?.status === 403) {
-        throw new HttpException(
-          {
-            message: 'GitHub API rate limit exceeded',
-          },
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
-      throw new HttpException(
-        {
-          message: 'Unable to communicate with GitHub',
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
-  async getUserDashboardStats(username: string) {
-    try {
-      const repos = await this.getUserRepositories(username);
-
-      let totalStars = 0;
-      let totalForks = 0;
-
-      const languageMap: Record<string, number> = {};
-
-      repos.forEach((repo: any) => {
-        totalStars += repo.stargazers_count;
-        totalForks += repo.forks_count;
-
-        if (repo.language) {
-          languageMap[repo.language] = (languageMap[repo.language] || 0) + 1;
-        }
-      });
-
-      const mostUsedLanguage =
-        Object.entries(languageMap).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      const stats = {
+        totalRepos: repos.length,
+        totalStars: repos.reduce(
+          (sum: number, repo: any) => sum + repo.stargazers_count,
+          0,
+        ),
+        totalForks: repos.reduce(
+          (sum: number, repo: any) => sum + repo.forks_count,
+          0,
+        ),
+        languageCount: Object.keys(languages).length,
+        mostUsedLanguage: this.getMostUsedLanguage(languages),
+      };
 
       return {
-        totalRepos: repos.length,
-        totalStars,
-        totalForks,
-        languageCount: Object.keys(languageMap).length,
-        mostUsedLanguage,
+        profile,
+        repositories: repos,
+        languages,
+        stats,
+        activity,
       };
     } catch (error) {
-      const err = error as AxiosError;
-      if (err.response?.status === 404) {
-        throw new HttpException(
-          {
-            message: `GitHub user '${username}' not found`,
-          },
-          HttpStatus.NOT_FOUND,
-        );
+      if (error.response?.status === 404) {
+        throw new NotFoundException(`GitHub user '${username}' not found`);
       }
 
       if (error.response?.status === 403) {
@@ -164,54 +80,23 @@ export class GithubService {
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }
-      throw new HttpException(
-        {
-          message: 'Unable to communicate with GitHub',
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+
+      throw new InternalServerErrorException(
+        'Unable to communicate with GitHub',
       );
     }
   }
-  async getUserRecentGithubActivity(username: string) {
-    try {
-      const response = await firstValueFrom(
-        this.http.get(
-          `${this.configService.get('base_url')}/users/${username}/events/public`,
-        ),
-      );
 
-      return response.data.map((event: any) => ({
-        id: event.id,
-        type: event.type,
-        repo: event.repo.name,
-        createdAt: event.created_at,
-      }));
-    } catch (error) {
-      const err = error as AxiosError;
-      if (err.response?.status === 404) {
-        throw new HttpException(
-          {
-            message: `GitHub user '${username}' not found`,
-          },
-          HttpStatus.NOT_FOUND,
-        );
-      }
+  private getMostUsedLanguage(
+    languages: Record<string, number>,
+  ): string | null {
+    const entries = Object.entries(languages);
 
-      if (error.response?.status === 403) {
-        throw new HttpException(
-          {
-            message: 'GitHub API rate limit exceeded',
-          },
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
-      throw new HttpException(
-        {
-          message: 'Unable to communicate with GitHub',
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    if (entries.length === 0) {
+      return null;
     }
+
+    return entries.sort((a, b) => b[1] - a[1])[0][0];
   }
   private async fetchRepositories(username: string) {
     const response = await firstValueFrom(

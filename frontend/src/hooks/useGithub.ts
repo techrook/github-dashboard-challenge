@@ -7,65 +7,26 @@ export function useGithub(username: string) {
   const enabled = username.trim().length > 0;
 
   const [
-    profile,
-    repositories,
-    languages,
-    stats,
-    activity,
+    dashboard
   ] = useQueries({
     queries: [
       {
-        queryKey: ["profile", username],
+        queryKey:["dashboard", username],
         queryFn: async () =>
-          (await githubApi.getProfile(username)).data.data,
+          (await githubApi.getDashboard(username)).data.data,
         enabled,
-      },
-      {
-        queryKey: ["repos", username],
-        queryFn: async () =>
-          (await githubApi.getRepositories(username)).data.data,
-        enabled,
-      },
-      {
-        queryKey: ["languages", username],
-        queryFn: async () =>
-          (await githubApi.getLanguages(username)).data.data,
-        enabled,
-      },
-      {
-        queryKey: ["stats", username],
-        queryFn: async () =>
-          (await githubApi.getStats(username)).data.data,
-        enabled,
-      },
-      {
-        queryKey: ["activity", username],
-        queryFn: async () =>
-          (await githubApi.getActivity(username)).data.data,
-        enabled,
-      },
+      }
     ],
   });
 
   return {
-    profile,
-    repositories,
-    languages,
-    stats,
-    activity,
+
+    dashboard,
 
     isLoading:
-      profile.isLoading ||
-      repositories.isLoading ||
-      languages.isLoading ||
-      stats.isLoading ||
-      activity.isLoading,
+      dashboard.isLoading,
 
     isError:
-      profile.isError ||
-      repositories.isError ||
-      languages.isError ||
-      stats.isError ||
-      activity.isError,
+      dashboard.isError,
   };
 }

@@ -6,23 +6,7 @@ const api = axios.create({
 });
 
 export const githubApi = {
-    getProfile(username: string) {
-      return api.get(`/github/users/${username}`);
-    },
-  
-    getRepositories(username: string) {
-      return api.get(`/github/users/${username}/repos`);
-    },
-  
-    getLanguages(username: string) {
-      return api.get(`/github/users/${username}/languages`);
-    },
-  
-    getStats(username: string) {
-      return api.get(`/github/users/${username}/stats`);
-    },
-  
-    getActivity(username: string) {
-      return api.get(`/github/users/${username}/activity`);
+    getDashboard(username: string) {
+      return api.get(`/github/users/${username}/dashboard`);
     },
   };
