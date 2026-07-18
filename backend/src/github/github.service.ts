@@ -36,8 +36,6 @@ export class GithubService {
       const profile = profileResponse.data;
       const repos = reposResponse.data;
       const activity = activityResponse.data.slice(0, 6);
-
-      // Aggregate languages
       const languages: Record<string, number> = {};
 
       repos.forEach((repo: any) => {

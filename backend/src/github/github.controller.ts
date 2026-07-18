@@ -7,9 +7,7 @@ import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 export class GithubController {
   constructor(private readonly githubService: GithubService) {}
   @Get('users/:username/dashboard')
-  async getGithubDashboard(
-    @Param('username') username: string,
-  ) {
+  async getGithubDashboard(@Param('username') username: string) {
     return this.githubService.getGithubDashboard(username);
   }
 }
