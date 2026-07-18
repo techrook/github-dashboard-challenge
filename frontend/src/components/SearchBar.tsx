@@ -32,7 +32,8 @@ export default function SearchBar({
   };
 
   return (
-    <div className="flex w-full max-w-2xl gap-3">
+    <div className="w-full max-w-3xl rounded-2xl border border-white/10 bg-card p-4 shadow-2xl backdrop-blur-xl">
+  <div className="flex gap-3">
       <Input
         placeholder="Search GitHub username..."
         value={username}
@@ -50,6 +51,7 @@ export default function SearchBar({
         <Search className="mr-2 h-4 w-4" />
         {loading ? "Searching..." : "Search"}
       </Button>
+    </div>
     </div>
   );
 }
