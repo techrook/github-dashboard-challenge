@@ -82,7 +82,7 @@ export class GithubService {
       throw new InternalServerErrorException(
         'Unable to communicate with GitHub',
       );
-    }
+    } //h
   }
 
   private getMostUsedLanguage(
