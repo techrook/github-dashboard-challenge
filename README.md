@@ -113,11 +113,7 @@ Install dependencies:
 npm install
 ```
 
-Create a `.env.local` file:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:3000
-```
+Use the .env.example file to configure the required environment variables.
 
 Start the frontend:
 
