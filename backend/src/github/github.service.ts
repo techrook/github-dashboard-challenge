@@ -6,29 +6,54 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
-import { AxiosError } from 'axios';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class GithubService {
+  private readonly baseUrl: string;
+  private readonly headers: Record<string, string>;
+
   constructor(
     private readonly http: HttpService,
     private readonly configService: ConfigService,
-  ) {}
+  ) {
+    this.baseUrl =
+      this.configService.get<string>('base_url') ??
+      'https://api.github.com';
+
+    const token = this.configService.get<string>('github_token');
+
+    this.headers = {
+      Accept: 'application/vnd.github+json',
+      ...(token && {
+        Authorization: `Bearer ${token}`,
+      }),
+    };
+  }
+
   async getGithubDashboard(username: string) {
     try {
       const [profileResponse, reposResponse, activityResponse] =
         await Promise.all([
           firstValueFrom(
-            this.http.get(`https://api.github.com/users/${username}`),
+            this.http.get(`${this.baseUrl}/users/${username}`, {
+              headers: this.headers,
+            }),
           ),
+
           firstValueFrom(
-            this.http.get(`https://api.github.com/users/${username}/repos`),
+            this.http.get(`${this.baseUrl}/users/${username}/repos`, {
+              headers: this.headers,
+            }),
           ),
+
           firstValueFrom(
             this.http.get(
-              `https://api.github.com/users/${username}/events/public`,
+              `${this.baseUrl}/users/${username}/events/public`,
+              {
+                headers: this.headers,
+              },
             ),
           ),
         ]);
@@ -36,25 +61,31 @@ export class GithubService {
       const profile = profileResponse.data;
       const repos = reposResponse.data;
       const activity = activityResponse.data.slice(0, 6);
+
       const languages: Record<string, number> = {};
 
       repos.forEach((repo: any) => {
         if (!repo.language) return;
 
-        languages[repo.language] = (languages[repo.language] || 0) + 1;
+        languages[repo.language] =
+          (languages[repo.language] || 0) + 1;
       });
 
       const stats = {
         totalRepos: repos.length,
+
         totalStars: repos.reduce(
           (sum: number, repo: any) => sum + repo.stargazers_count,
           0,
         ),
+
         totalForks: repos.reduce(
           (sum: number, repo: any) => sum + repo.forks_count,
           0,
         ),
+
         languageCount: Object.keys(languages).length,
+
         mostUsedLanguage: this.getMostUsedLanguage(languages),
       };
 
@@ -65,24 +96,29 @@ export class GithubService {
         stats,
         activity,
       };
-    } catch (error) {
-      if (error.response?.status === 404) {
-        throw new NotFoundException(`GitHub user '${username}' not found`);
+    } catch (error: any) {
+      const status = error?.response?.status;
+
+      if (status === 404) {
+        throw new NotFoundException(
+          `GitHub user '${username}' not found`,
+        );
       }
 
-      if (error.response?.status === 403) {
+      if (status === 403) {
         throw new HttpException(
           {
-            message: 'GitHub API rate limit exceeded',
+            message:
+              'GitHub API rate limit exceeded. Please try again later.',
           },
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }
 
       throw new InternalServerErrorException(
-        'Unable to communicate with GitHub',
+        'Unable to communicate with GitHub.',
       );
-    } 
+    }
   }
 
   private getMostUsedLanguage(
@@ -90,19 +126,10 @@ export class GithubService {
   ): string | null {
     const entries = Object.entries(languages);
 
-    if (entries.length === 0) {
+    if (!entries.length) {
       return null;
     }
 
     return entries.sort((a, b) => b[1] - a[1])[0][0];
-  }
-  private async fetchRepositories(username: string) {
-    const response = await firstValueFrom(
-      this.http.get(
-        `${this.configService.get('base_url')}/users/${username}/repos`,
-      ),
-    );
-
-    return response.data;
   }
 }
