@@ -26,8 +26,8 @@ async function bootstrap() {
 
   app.enableCors({
     origin: process.env.ALLOWED_ORIGINS?.split(',') || [
-      'http://localhost:3000',
-      `${process.env.FRONTEND_URL}`
+      'https://chic-enchantment-production-5d67.up.railway.app',
+      "http://localhost:3000",
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
